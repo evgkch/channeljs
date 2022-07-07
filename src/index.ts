@@ -11,11 +11,29 @@ export type MessageMap = { [msg in Message]: any[] };
 
 export type Subscribers<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
 
+const maps = {
+	/** Channel -> Subscribers */
+	ch_sb: new WeakMap,
+	/** Tx -> Channel */
+	tx_ch: new WeakMap,
+	/** Rx -> Channel */
+	rx_ch: new WeakMap
+};
+
 export default class Channel<M extends MessageMap> {
 
-	#subscribers: Subscribers<M> = new Map;
-	readonly tx = new Tx(this.#subscribers);
-	readonly rx = new Rx(this.#subscribers);
+	readonly tx: Tx<M>;
+	readonly rx: Rx<M>;
+
+	constructor() {
+		maps.ch_sb.set(this, new Map);
+		this.tx = new Tx(this);
+		this.rx = new Rx(this);
+	}
+
+	get #subscribers(): Subscribers<M> {
+		return maps.ch_sb.get(this) as Subscribers<M>;
+	}
 
     /**
 	 * Getting all signals
@@ -38,10 +56,16 @@ export default class Channel<M extends MessageMap> {
  */
 export class Tx<M extends MessageMap> {
 
-	#subscribers: Subscribers<M>;
+	constructor(channel: Channel<M>) {
+		maps.tx_ch.set(this, channel);
+	}
 
-	constructor(subscribers: Subscribers<M>) {
-		this.#subscribers = subscribers;
+	get #channel() {
+		return maps.tx_ch.get(this) as Channel<M>;
+	}
+
+	get #subscribers() {
+		return maps.ch_sb.get(this.#channel) as Subscribers<M>;
 	}
 
 	/**
@@ -79,10 +103,16 @@ export class Tx<M extends MessageMap> {
  */
 export class Rx<M extends MessageMap> {
 
-	#subscribers: Subscribers<M>;
+	constructor(channel: Channel<M>) {
+		maps.rx_ch.set(this, channel);
+	}
 
-	constructor(subscribers: Subscribers<M>) {
-		this.#subscribers = subscribers;
+	get #channel() {
+		return maps.rx_ch.get(this) as Channel<M>;
+	}
+
+	get #subscribers() {
+		return maps.ch_sb.get(this.#channel) as Subscribers<M>;
 	}
 
 	/**

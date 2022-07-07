@@ -13,6 +13,7 @@ export default class Channel<M extends MessageMap> {
     #private;
     readonly tx: Tx<M>;
     readonly rx: Rx<M>;
+    constructor();
     /**
      * Getting all signals
      */
@@ -27,7 +28,7 @@ export default class Channel<M extends MessageMap> {
  */
 export declare class Tx<M extends MessageMap> {
     #private;
-    constructor(subscribers: Subscribers<M>);
+    constructor(channel: Channel<M>);
     /**
      * Emit a signal that provides to the signal's subscribers.
      *
@@ -48,7 +49,7 @@ export declare class Tx<M extends MessageMap> {
  */
 export declare class Rx<M extends MessageMap> {
     #private;
-    constructor(subscribers: Subscribers<M>);
+    constructor(channel: Channel<M>);
     /**
      * Subscribe on a message.
      * Returns the provided listener.

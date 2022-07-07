@@ -1,10 +1,25 @@
 /**
  * A lib to create a channel to send and receive messages
  */
+const maps = {
+    /** Channel -> Subscribers */
+    ch_sb: new WeakMap,
+    /** Tx -> Channel */
+    tx_ch: new WeakMap,
+    /** Rx -> Channel */
+    rx_ch: new WeakMap
+};
 export default class Channel {
-    #subscribers = new Map;
-    tx = new Tx(this.#subscribers);
-    rx = new Rx(this.#subscribers);
+    tx;
+    rx;
+    constructor() {
+        maps.ch_sb.set(this, new Map);
+        this.tx = new Tx(this);
+        this.rx = new Rx(this);
+    }
+    get #subscribers() {
+        return maps.ch_sb.get(this);
+    }
     /**
      * Getting all signals
      */
@@ -22,9 +37,14 @@ export default class Channel {
  * Message Transmitter
  */
 export class Tx {
-    #subscribers;
-    constructor(subscribers) {
-        this.#subscribers = subscribers;
+    constructor(channel) {
+        maps.tx_ch.set(this, channel);
+    }
+    get #channel() {
+        return maps.tx_ch.get(this);
+    }
+    get #subscribers() {
+        return maps.ch_sb.get(this.#channel);
     }
     /**
      * Emit a signal that provides to the signal's subscribers.
@@ -55,9 +75,14 @@ export class Tx {
  * Message Receiver
  */
 export class Rx {
-    #subscribers;
-    constructor(subscribers) {
-        this.#subscribers = subscribers;
+    constructor(channel) {
+        maps.rx_ch.set(this, channel);
+    }
+    get #channel() {
+        return maps.rx_ch.get(this);
+    }
+    get #subscribers() {
+        return maps.ch_sb.get(this.#channel);
     }
     /**
      * Subscribe on a message.
