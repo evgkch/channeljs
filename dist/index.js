@@ -1,50 +1,24 @@
 /**
  * A lib to create a channel to send and receive messages
  */
-const maps = {
-    /** Channel -> Subscribers */
-    ch_sb: new WeakMap,
-    /** Tx -> Channel */
-    tx_ch: new WeakMap,
-    /** Rx -> Channel */
-    rx_ch: new WeakMap
-};
-export default class Channel {
-    tx;
-    rx;
-    constructor() {
-        maps.ch_sb.set(this, new Map);
-        this.tx = new Tx(this);
-        this.rx = new Rx(this);
-    }
-    get #subscribers() {
-        return maps.ch_sb.get(this);
-    }
-    /**
-     * Getting all signals
-     */
-    get messages() {
-        return Array.from(this.#subscribers.keys());
-    }
-    /**
-     * Clear all subsribers
-     */
-    clear() {
-        this.#subscribers.clear();
-    }
+export function channel() {
+    const ch = new Map;
+    return {
+        ch,
+        tx: new Tx(ch),
+        rx: new Rx(ch)
+    };
 }
 /**
  * Message Transmitter
  */
 export class Tx {
+    static #ch_map = new WeakMap;
     constructor(channel) {
-        maps.tx_ch.set(this, channel);
+        Tx.#ch_map.set(this, channel);
     }
     get #channel() {
-        return maps.tx_ch.get(this);
-    }
-    get #subscribers() {
-        return maps.ch_sb.get(this.#channel);
+        return Tx.#ch_map.get(this);
     }
     /**
      * Emit a signal that provides to the signal's subscribers.
@@ -53,7 +27,7 @@ export class Tx {
      * Returns true if the signal had listeners, false otherwise
      */
     send(msg, ...args) {
-        const listeners = this.#subscribers.get(msg);
+        const listeners = this.#channel.get(msg);
         if (listeners && listeners.size > 0) {
             for (const cb of listeners)
                 cb(...args);
@@ -75,14 +49,12 @@ export class Tx {
  * Message Receiver
  */
 export class Rx {
+    static #ch_map = new WeakMap;
     constructor(channel) {
-        maps.rx_ch.set(this, channel);
+        Rx.#ch_map.set(this, channel);
     }
     get #channel() {
-        return maps.rx_ch.get(this);
-    }
-    get #subscribers() {
-        return maps.ch_sb.get(this.#channel);
+        return Rx.#ch_map.get(this);
     }
     /**
      * Subscribe on a message.
@@ -91,11 +63,11 @@ export class Rx {
      * Ex.: rx.on('msg', listener)
      */
     on(msg, listener) {
-        const listeners = this.#subscribers.get(msg);
+        const listeners = this.#channel.get(msg);
         if (listeners)
             listeners.add(listener);
         else
-            this.#subscribers.set(msg, new Set([listener]));
+            this.#channel.set(msg, new Set([listener]));
         return listener;
     }
     /**
@@ -134,15 +106,6 @@ export class Rx {
      * Ex.: rx.off('msg', listener)
      */
     off(msg, listener) {
-        return !!this.#subscribers.get(msg)?.delete(listener);
-    }
-    /**
-     * Ubsubscribe all listeners from the message.
-     * Returns true if message existed, false otherwise.
-     *
-     * Ex.: rx.off_all('msg')
-     */
-    off_all(msg) {
-        return this.#subscribers.delete(msg);
+        return !!this.#channel.get(msg)?.delete(listener);
     }
 }

@@ -4,7 +4,7 @@ A lib to create a channel to send and receive messages
 ## Usage
 ```typescript
 // Import lib
-import Channel from '/channeljs';
+import { channel } from '/channeljs';
 
 // Define a Message Map that will be implemented to a Channel:
 // keys of the Map are messages (may be string, number or symbol);
@@ -14,8 +14,7 @@ type MessageMap = {
 };
 
 // Create a channel
-const channel = new Channel<MessageMap>();
-const { rx, tx } = channel;
+const { ch, rx, tx } = channel<MessageMap>();
 
 {
     // Create a handle listener
@@ -53,5 +52,5 @@ tx.send(':click', 20, 30);
 // But you you lost your 'lambda' listener cause we out of the scope.
 // To make sure that we have no leaks call 'clear' at channel.
 // It guarantees that all subscribers will be removed
-channel.clear();
+ch.clear();
 ```

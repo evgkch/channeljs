@@ -8,21 +8,12 @@ export declare type Message = string | number | symbol;
 export declare type MessageMap = {
     [msg in Message]: any[];
 };
-export declare type Subscribers<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
-export default class Channel<M extends MessageMap> {
-    #private;
-    readonly tx: Tx<M>;
-    readonly rx: Rx<M>;
-    constructor();
-    /**
-     * Getting all signals
-     */
-    get messages(): (keyof M)[];
-    /**
-     * Clear all subsribers
-     */
-    clear(): void;
-}
+export declare type Channel<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
+export declare function channel<M extends MessageMap>(): {
+    ch: Channel<M>;
+    tx: Tx<M>;
+    rx: Rx<M>;
+};
 /**
  * Message Transmitter
  */
@@ -78,11 +69,4 @@ export declare class Rx<M extends MessageMap> {
      * Ex.: rx.off('msg', listener)
      */
     off<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): boolean;
-    /**
-     * Ubsubscribe all listeners from the message.
-     * Returns true if message existed, false otherwise.
-     *
-     * Ex.: rx.off_all('msg')
-     */
-    off_all(msg: keyof M): boolean;
 }

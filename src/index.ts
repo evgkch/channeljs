@@ -9,46 +9,15 @@ export type Message = string | number | symbol;
  */
 export type MessageMap = { [msg in Message]: any[] };
 
-export type Subscribers<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
+export type Channel<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
 
-const maps = {
-	/** Channel -> Subscribers */
-	ch_sb: new WeakMap,
-	/** Tx -> Channel */
-	tx_ch: new WeakMap,
-	/** Rx -> Channel */
-	rx_ch: new WeakMap
-};
-
-export default class Channel<M extends MessageMap> {
-
-	readonly tx: Tx<M>;
-	readonly rx: Rx<M>;
-
-	constructor() {
-		maps.ch_sb.set(this, new Map);
-		this.tx = new Tx(this);
-		this.rx = new Rx(this);
-	}
-
-	get #subscribers(): Subscribers<M> {
-		return maps.ch_sb.get(this) as Subscribers<M>;
-	}
-
-    /**
-	 * Getting all signals
-	 */
-	get messages(): (keyof M)[] {
-		return Array.from(this.#subscribers.keys());
-	}
-
-	/**
-	 * Clear all subsribers
-	 */
-	clear() {
-		this.#subscribers.clear();
-	}
-
+export function channel<M extends MessageMap>() {
+	const ch: Channel<M> = new Map;
+	return {
+		ch,
+		tx: new Tx(ch),
+		rx: new Rx(ch)
+	};
 }
 
 /**
@@ -56,16 +25,14 @@ export default class Channel<M extends MessageMap> {
  */
 export class Tx<M extends MessageMap> {
 
+	static #ch_map: WeakMap<Tx<MessageMap>, Channel<MessageMap>> = new WeakMap;
+
 	constructor(channel: Channel<M>) {
-		maps.tx_ch.set(this, channel);
+		Tx.#ch_map.set(this as Tx<MessageMap>, channel);
 	}
 
 	get #channel() {
-		return maps.tx_ch.get(this) as Channel<M>;
-	}
-
-	get #subscribers() {
-		return maps.ch_sb.get(this.#channel) as Subscribers<M>;
+		return Tx.#ch_map.get(this) as Channel<M>;
 	}
 
 	/**
@@ -75,7 +42,7 @@ export class Tx<M extends MessageMap> {
 	 * Returns true if the signal had listeners, false otherwise
 	 */
 	send<S extends keyof M>(msg: S, ...args: M[S]): boolean {
-		const listeners = this.#subscribers.get(msg);
+		const listeners = this.#channel.get(msg);
 		if (listeners && listeners.size > 0)
 		{
 			for (const cb of listeners) cb(...args);
@@ -103,16 +70,14 @@ export class Tx<M extends MessageMap> {
  */
 export class Rx<M extends MessageMap> {
 
+	static #ch_map: WeakMap<Rx<MessageMap>, Channel<MessageMap>> = new WeakMap;
+
 	constructor(channel: Channel<M>) {
-		maps.rx_ch.set(this, channel);
+		Rx.#ch_map.set(this as Rx<MessageMap>, channel);
 	}
 
 	get #channel() {
-		return maps.rx_ch.get(this) as Channel<M>;
-	}
-
-	get #subscribers() {
-		return maps.ch_sb.get(this.#channel) as Subscribers<M>;
+		return Rx.#ch_map.get(this) as Channel<M>;
 	}
 
 	/**
@@ -122,11 +87,11 @@ export class Rx<M extends MessageMap> {
 	 * Ex.: rx.on('msg', listener)
 	 */
 	on<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): (...args: M[S]) => any {
-		const listeners = this.#subscribers.get(msg);
+		const listeners = this.#channel.get(msg);
 		if (listeners)
 			listeners.add(listener as (...args: M[keyof M]) => any);
 		else
-			this.#subscribers.set(msg, new Set([listener as (...args: M[keyof M]) => any]));
+			this.#channel.set(msg, new Set([listener as (...args: M[keyof M]) => any]));
 
 		return listener;
   	}
@@ -169,17 +134,7 @@ export class Rx<M extends MessageMap> {
 	 * Ex.: rx.off('msg', listener)
 	 */
 	off<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): boolean {
-		return !!this.#subscribers.get(msg)?.delete(listener as (...args: M[keyof M]) => any);
-	}
-
-	/**
-	 * Ubsubscribe all listeners from the message.
-     * Returns true if message existed, false otherwise.
-	 *
-	 * Ex.: rx.off_all('msg')
-	 */
-	off_all(msg: keyof M): boolean {
-		return this.#subscribers.delete(msg);
+		return !!this.#channel.get(msg)?.delete(listener as (...args: M[keyof M]) => any);
 	}
 
 }
