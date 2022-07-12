@@ -8,18 +8,25 @@ export declare type Message = string | number | symbol;
 export declare type MessageMap = {
     [msg in Message]: any[];
 };
-export declare type Channel<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
-export declare function channel<M extends MessageMap>(): {
-    ch: Channel<M>;
-    tx: Tx<M>;
-    rx: Rx<M>;
-};
+export declare type Subscribers<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
+/**
+ * Channel
+ */
+export default class Channel<M extends MessageMap> {
+    #private;
+    readonly tx: Tx<M>;
+    readonly rx: Rx<M>;
+    /**
+     * Clear subscribers
+     */
+    clear(): void;
+}
 /**
  * Message Transmitter
  */
 export declare class Tx<M extends MessageMap> {
     #private;
-    constructor(channel: Channel<M>);
+    constructor(subscribers: Subscribers<M>);
     /**
      * Emit a signal that provides to the signal's subscribers.
      *
@@ -33,14 +40,14 @@ export declare class Tx<M extends MessageMap> {
      * Ex.: tx.send_async('msg', [...args])
      * Returns Promise<true> if the event had listeners, Promise<false> otherwise
      */
-    send_async<S extends keyof M>(signal: S, ...args: M[S]): Promise<boolean>;
+    send_async<S extends keyof M>(msg: S, ...args: M[S]): Promise<boolean>;
 }
 /**
  * Message Receiver
  */
 export declare class Rx<M extends MessageMap> {
     #private;
-    constructor(channel: Channel<M>);
+    constructor(subscribers: Subscribers<M>);
     /**
      * Subscribe on a message.
      * Returns the provided listener.

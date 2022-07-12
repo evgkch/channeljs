@@ -9,15 +9,24 @@ export type Message = string | number | symbol;
  */
 export type MessageMap = { [msg in Message]: any[] };
 
-export type Channel<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
+export type Subscribers<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
 
-export function channel<M extends MessageMap>() {
-	const ch: Channel<M> = new Map;
-	return {
-		ch,
-		tx: new Tx(ch),
-		rx: new Rx(ch)
-	};
+/**
+ * Channel
+ */
+export default class Channel<M extends MessageMap> {
+
+	#subscribers: Subscribers<M> = new Map;
+	readonly tx: Tx<M> = new Tx(this.#subscribers as Subscribers<M>);
+	readonly rx: Rx<M> = new Rx(this.#subscribers as Subscribers<M>);
+
+	/**
+	 * Clear subscribers
+	 */
+	clear() {
+		this.#subscribers.clear();
+	}
+
 }
 
 /**
@@ -25,14 +34,10 @@ export function channel<M extends MessageMap>() {
  */
 export class Tx<M extends MessageMap> {
 
-	static #ch_map: WeakMap<Tx<MessageMap>, Channel<MessageMap>> = new WeakMap;
+	#subscribers: Subscribers<M>;
 
-	constructor(channel: Channel<M>) {
-		Tx.#ch_map.set(this as Tx<MessageMap>, channel);
-	}
-
-	get #channel() {
-		return Tx.#ch_map.get(this) as Channel<M>;
+	constructor(subscribers: Subscribers<M>) {
+		this.#subscribers = subscribers;
 	}
 
 	/**
@@ -42,7 +47,7 @@ export class Tx<M extends MessageMap> {
 	 * Returns true if the signal had listeners, false otherwise
 	 */
 	send<S extends keyof M>(msg: S, ...args: M[S]): boolean {
-		const listeners = this.#channel.get(msg);
+		const listeners = this.#subscribers.get(msg);
 		if (listeners && listeners.size > 0)
 		{
 			for (const cb of listeners) cb(...args);
@@ -57,9 +62,9 @@ export class Tx<M extends MessageMap> {
 	 * Ex.: tx.send_async('msg', [...args])
 	 * Returns Promise<true> if the event had listeners, Promise<false> otherwise
 	 */
-	send_async<S extends keyof M>(signal: S, ...args: M[S]): Promise<boolean> {
+	send_async<S extends keyof M>(msg: S, ...args: M[S]): Promise<boolean> {
 		return new Promise(resolve =>
-			setTimeout(() => resolve(this.send(signal, ...args)), 0)
+			setTimeout(() => resolve(this.send(msg, ...args)), 0)
 		);
 	}
 
@@ -70,14 +75,10 @@ export class Tx<M extends MessageMap> {
  */
 export class Rx<M extends MessageMap> {
 
-	static #ch_map: WeakMap<Rx<MessageMap>, Channel<MessageMap>> = new WeakMap;
+	#subscribers: Subscribers<M>;
 
-	constructor(channel: Channel<M>) {
-		Rx.#ch_map.set(this as Rx<MessageMap>, channel);
-	}
-
-	get #channel() {
-		return Rx.#ch_map.get(this) as Channel<M>;
+	constructor(subscribers: Subscribers<M>) {
+		this.#subscribers = subscribers;
 	}
 
 	/**
@@ -87,11 +88,11 @@ export class Rx<M extends MessageMap> {
 	 * Ex.: rx.on('msg', listener)
 	 */
 	on<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): (...args: M[S]) => any {
-		const listeners = this.#channel.get(msg);
+		const listeners = this.#subscribers.get(msg);
 		if (listeners)
 			listeners.add(listener as (...args: M[keyof M]) => any);
 		else
-			this.#channel.set(msg, new Set([listener as (...args: M[keyof M]) => any]));
+			this.#subscribers.set(msg, new Set([listener as (...args: M[keyof M]) => any]));
 
 		return listener;
   	}
@@ -134,7 +135,7 @@ export class Rx<M extends MessageMap> {
 	 * Ex.: rx.off('msg', listener)
 	 */
 	off<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): boolean {
-		return !!this.#channel.get(msg)?.delete(listener as (...args: M[keyof M]) => any);
+		return !!this.#subscribers.get(msg)?.delete(listener as (...args: M[keyof M]) => any);
 	}
 
 }

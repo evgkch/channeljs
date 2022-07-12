@@ -1,24 +1,27 @@
 /**
  * A lib to create a channel to send and receive messages
  */
-export function channel() {
-    const ch = new Map;
-    return {
-        ch,
-        tx: new Tx(ch),
-        rx: new Rx(ch)
-    };
+/**
+ * Channel
+ */
+export default class Channel {
+    #subscribers = new Map;
+    tx = new Tx(this.#subscribers);
+    rx = new Rx(this.#subscribers);
+    /**
+     * Clear subscribers
+     */
+    clear() {
+        this.#subscribers.clear();
+    }
 }
 /**
  * Message Transmitter
  */
 export class Tx {
-    static #ch_map = new WeakMap;
-    constructor(channel) {
-        Tx.#ch_map.set(this, channel);
-    }
-    get #channel() {
-        return Tx.#ch_map.get(this);
+    #subscribers;
+    constructor(subscribers) {
+        this.#subscribers = subscribers;
     }
     /**
      * Emit a signal that provides to the signal's subscribers.
@@ -27,7 +30,7 @@ export class Tx {
      * Returns true if the signal had listeners, false otherwise
      */
     send(msg, ...args) {
-        const listeners = this.#channel.get(msg);
+        const listeners = this.#subscribers.get(msg);
         if (listeners && listeners.size > 0) {
             for (const cb of listeners)
                 cb(...args);
@@ -41,20 +44,17 @@ export class Tx {
      * Ex.: tx.send_async('msg', [...args])
      * Returns Promise<true> if the event had listeners, Promise<false> otherwise
      */
-    send_async(signal, ...args) {
-        return new Promise(resolve => setTimeout(() => resolve(this.send(signal, ...args)), 0));
+    send_async(msg, ...args) {
+        return new Promise(resolve => setTimeout(() => resolve(this.send(msg, ...args)), 0));
     }
 }
 /**
  * Message Receiver
  */
 export class Rx {
-    static #ch_map = new WeakMap;
-    constructor(channel) {
-        Rx.#ch_map.set(this, channel);
-    }
-    get #channel() {
-        return Rx.#ch_map.get(this);
+    #subscribers;
+    constructor(subscribers) {
+        this.#subscribers = subscribers;
     }
     /**
      * Subscribe on a message.
@@ -63,11 +63,11 @@ export class Rx {
      * Ex.: rx.on('msg', listener)
      */
     on(msg, listener) {
-        const listeners = this.#channel.get(msg);
+        const listeners = this.#subscribers.get(msg);
         if (listeners)
             listeners.add(listener);
         else
-            this.#channel.set(msg, new Set([listener]));
+            this.#subscribers.set(msg, new Set([listener]));
         return listener;
     }
     /**
@@ -106,6 +106,6 @@ export class Rx {
      * Ex.: rx.off('msg', listener)
      */
     off(msg, listener) {
-        return !!this.#channel.get(msg)?.delete(listener);
+        return !!this.#subscribers.get(msg)?.delete(listener);
     }
 }
