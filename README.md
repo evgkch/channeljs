@@ -4,7 +4,7 @@ A lib to create a channel to send and receive messages
 ## Usage
 ```typescript
 // Import lib
-import { channel } from '/channeljs';
+import Channel from '/channeljs';
 
 // Define a Message Map that will be implemented to a Channel:
 // keys of the Map are messages (may be string, number or symbol);
