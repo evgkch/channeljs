@@ -97,7 +97,7 @@ export class Rx {
             else
                 self.off(msg, f);
         })(this));
-        return ref;
+        return listener;
     }
     /**
      * Ubsubscribe listener from the message.

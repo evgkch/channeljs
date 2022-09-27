@@ -116,7 +116,7 @@ export class Rx<M extends MessageMap> {
 	 *
 	 * Ex.: rx.onweak('msg', listener)
 	 */
-	onweak<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): WeakRef<(...args: M[S]) => any> {
+	onweak<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): (...args: M[S]) => any {
 		const ref = new WeakRef(listener);
 		this.on(msg, (self => function f(...args: M[S]) {
 			const listener = ref.deref();
@@ -125,7 +125,7 @@ export class Rx<M extends MessageMap> {
 			else
 				self.off(msg, f);
 		})(this));
-        return ref;
+        return listener;
   	}
 
 	/**

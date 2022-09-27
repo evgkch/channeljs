@@ -68,7 +68,7 @@ export declare class Rx<M extends MessageMap> {
      *
      * Ex.: rx.onweak('msg', listener)
      */
-    onweak<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): WeakRef<(...args: M[S]) => any>;
+    onweak<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): (...args: M[S]) => any;
     /**
      * Ubsubscribe listener from the message.
      * Returns true if message and listener existed, false otherwise.
