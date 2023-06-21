@@ -63,7 +63,7 @@ export class Tx<M extends MessageMap> {
 	 * Returns Promise<true> if the event had listeners, Promise<false> otherwise
 	 */
 	send_async<S extends keyof M>(msg: S, ...args: M[S]): Promise<boolean> {
-		return new Promise(resolve =>
+		return new Promise((resolve) =>
 			setTimeout(() => resolve(this.send(msg, ...args)), 0)
 		);
 	}

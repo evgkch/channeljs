@@ -1,6 +1,6 @@
 {
   "name": "channeljs",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A lib to create a channel to send and receive messages",
   "main": "dist/index.js",
   "scripts": {
