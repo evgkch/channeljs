@@ -45,7 +45,7 @@ export class Tx {
      * Returns Promise<true> if the event had listeners, Promise<false> otherwise
      */
     send_async(msg, ...args) {
-        return new Promise(resolve => setTimeout(() => resolve(this.send(msg, ...args)), 0));
+        return new Promise((resolve) => setTimeout(() => resolve(this.send(msg, ...args)), 0));
     }
 }
 /**
