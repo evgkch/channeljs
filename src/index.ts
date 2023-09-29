@@ -16,6 +16,20 @@ export type Subscribers<M extends MessageMap> = Map<keyof M, Set<(...args: M[key
  */
 export default class Channel<M extends MessageMap> {
 
+	static #channels: WeakMap<object, Channel<MessageMap>> = new WeakMap;
+
+	static has(target: object) {
+		return this.#channels.has(target);
+	}
+
+	static get(target: object) {
+		return this.#channels.get(target);
+	}
+
+	static add(target: object) {
+		this.#channels.set(target, new Channel);
+	}
+
 	#subscribers: Subscribers<M> = new Map;
 	readonly tx: Tx<M> = new Tx(this.#subscribers as Subscribers<M>);
 	readonly rx: Rx<M> = new Rx(this.#subscribers as Subscribers<M>);
