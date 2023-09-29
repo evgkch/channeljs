@@ -1,19 +1,22 @@
 /**
  * A lib to create a channel to send and receive messages
  */
-export declare type Message = string | number | symbol;
+export type Message = string | number | symbol;
 /**
  * Match signal with its args
  */
-export declare type MessageMap = {
+export type MessageMap = {
     [msg in Message]: any[];
 };
-export declare type Subscribers<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
+export type Subscribers<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
 /**
  * Channel
  */
 export default class Channel<M extends MessageMap> {
     #private;
+    static has(target: object): boolean;
+    static get(target: object): Channel<MessageMap> | undefined;
+    static add(target: object): void;
     readonly tx: Tx<M>;
     readonly rx: Rx<M>;
     /**

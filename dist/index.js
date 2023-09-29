@@ -5,6 +5,16 @@
  * Channel
  */
 export default class Channel {
+    static #channels = new WeakMap;
+    static has(target) {
+        return this.#channels.has(target);
+    }
+    static get(target) {
+        return this.#channels.get(target);
+    }
+    static add(target) {
+        this.#channels.set(target, new Channel);
+    }
     #subscribers = new Map;
     tx = new Tx(this.#subscribers);
     rx = new Rx(this.#subscribers);
