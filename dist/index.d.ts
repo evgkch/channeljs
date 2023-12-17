@@ -1,7 +1,7 @@
 /**
  * A lib to create a channel to send and receive messages
  */
-export type Message = string | number | symbol;
+export type Message = any;
 /**
  * Match signal with its args
  */
