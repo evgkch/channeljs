@@ -10,7 +10,7 @@ export default class Channel {
         return this.#channels.has(target);
     }
     static get(target) {
-        return this.#channels.get(target);
+        return this.#channels.get(target).#subscribers;
     }
     static add(target) {
         this.#channels.set(target, new Channel);

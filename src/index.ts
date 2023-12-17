@@ -7,9 +7,9 @@ export type Message = any;
 /**
  * Match signal with its args
  */
-export type MessageMap = { [msg in Message]: any[] };
+export type MessageMap = [message: Message, args: any[]][]
 
-export type Subscribers<M extends MessageMap> = Map<keyof M, Set<(...args: M[keyof M]) => any>>;
+export type Subscribers<M extends MessageMap> = Map<M[number][0], Set<(...args: M[number][1]) => any>>;
 
 /**
  * Channel
@@ -23,7 +23,7 @@ export default class Channel<M extends MessageMap> {
 	}
 
 	static get(target: object) {
-		return this.#channels.get(target);
+		return this.#channels.get(target)!.#subscribers;
 	}
 
 	static add(target: object) {
@@ -60,7 +60,7 @@ export class Tx<M extends MessageMap> {
 	 * Ex.: tx.send('msg', [...args])
 	 * Returns true if the signal had listeners, false otherwise
 	 */
-	send<S extends keyof M>(msg: S, ...args: M[S]): boolean {
+	send<S extends M[number]>(msg: S[0], ...args: S[1]): boolean {
 		const listeners = this.#subscribers.get(msg);
 		if (listeners && listeners.size > 0)
 		{
@@ -76,7 +76,7 @@ export class Tx<M extends MessageMap> {
 	 * Ex.: tx.send_async('msg', [...args])
 	 * Returns Promise<true> if the event had listeners, Promise<false> otherwise
 	 */
-	send_async<S extends keyof M>(msg: S, ...args: M[S]): Promise<boolean> {
+	send_async<S extends M[number]>(msg: S[0], ...args: S[1]): Promise<boolean> {
 		return new Promise((resolve) =>
 			setTimeout(() => resolve(this.send(msg, ...args)), 0)
 		);
@@ -101,12 +101,12 @@ export class Rx<M extends MessageMap> {
 	 *
 	 * Ex.: rx.on('msg', listener)
 	 */
-	on<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): (...args: M[S]) => any {
+	on<S extends M[number]>(msg: S[0], listener: (...args: S[1]) => any): (...args: S[1]) => any {
 		const listeners = this.#subscribers.get(msg);
 		if (listeners)
-			listeners.add(listener as (...args: M[keyof M]) => any);
+			listeners.add(listener);
 		else
-			this.#subscribers.set(msg, new Set([listener as (...args: M[keyof M]) => any]));
+			this.#subscribers.set(msg, new Set([listener]));
 
 		return listener;
   	}
@@ -117,8 +117,8 @@ export class Rx<M extends MessageMap> {
 	 *
 	 * Ex.: rx.once('msg', listener)
 	 */
-	once<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): (...args: M[S]) => any {
-		return this.on(msg, (self => function f(...args: M[S]) {
+	once<S extends M[number]>(msg: S[0], listener: (...args: S[1]) => any): (...args: S[1]) => any {
+		return this.on(msg, (self => function f(...args: S[1]) {
 			self.off(msg, f);
 			listener(...args);
 		})(this))
@@ -130,9 +130,9 @@ export class Rx<M extends MessageMap> {
 	 *
 	 * Ex.: rx.onweak('msg', listener)
 	 */
-	onweak<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): (...args: M[S]) => any {
+	onweak<S extends M[number]>(msg: S[0], listener: (...args: S[1]) => any): (...args: S[1]) => any {
 		const ref = new WeakRef(listener);
-		this.on(msg, (self => function f(...args: M[S]) {
+		this.on(msg, (self => function f(...args: S[1]) {
 			const listener = ref.deref();
 			if (listener)
 				listener(...args);
@@ -148,8 +148,8 @@ export class Rx<M extends MessageMap> {
 	 *
 	 * Ex.: rx.off('msg', listener)
 	 */
-	off<S extends keyof M>(msg: S, listener: (...args: M[S]) => any): boolean {
-		return !!this.#subscribers.get(msg)?.delete(listener as (...args: M[keyof M]) => any);
+	off<S extends M[number]>(msg: S, listener: (...args: S[1]) => any): boolean {
+		return !!this.#subscribers.get(msg)?.delete(listener);
 	}
 
 }
