@@ -148,7 +148,7 @@ export class Rx<M extends MessageMap> {
 	 *
 	 * Ex.: rx.off('msg', listener)
 	 */
-	off<S extends M[number]>(msg: S, listener: (...args: S[1]) => any): boolean {
+	off<S extends M[number]>(msg: S[0], listener: (...args: S[1]) => any): boolean {
 		return !!this.#subscribers.get(msg)?.delete(listener);
 	}
 
