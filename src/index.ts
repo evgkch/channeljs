@@ -1,155 +1,91 @@
 /**
- * A lib to create a channel to send and receive messages
+ * channeljs — a tiny, typed pub/sub channel.
+ *
+ * A `Channel<M>` is described by a `MessageMap` M: an object binding each message
+ * to the argument tuple its listeners receive. The same channel is exposed through
+ * two interface-typed views — `tx` to send and `rx` to subscribe.
  */
 
-export type Message = any;
+/** Binds each message to the argument tuple delivered to its listeners. */
+export type MessageMap = Record<PropertyKey, any[]>;
 
-/**
- * Match signal with its args
- */
-export type MessageMap = [message: Message, args: any[]][]
+/** A listener for one message's argument tuple. */
+export type Listener<A extends any[]> = (...args: A) => void;
 
-export type Subscribers<M extends MessageMap> = Map<M[number][0], Set<(...args: M[number][1]) => any>>;
+/** Unsubscribe handle. Returns `true` if a listener was removed, `false` if already gone. */
+export type Off = () => boolean;
 
-/**
- * Channel
- */
-export default class Channel<M extends MessageMap> {
+/** The sending side of a channel. */
+export interface Tx<M extends MessageMap> {
+    /** Emit a message to its subscribers. Returns `true` if it had listeners. */
+    send<K extends keyof M>(msg: K, ...args: M[K]): boolean;
+}
 
-	static #channels: WeakMap<object, Channel<MessageMap>> = new WeakMap;
-
-	static has(target: object) {
-		return this.#channels.has(target);
-	}
-
-	static get(target: object) {
-		return this.#channels.get(target)!.#subscribers;
-	}
-
-	static add(target: object) {
-		this.#channels.set(target, new Channel);
-	}
-
-	#subscribers: Subscribers<M> = new Map;
-	readonly tx: Tx<M> = new Tx(this.#subscribers as Subscribers<M>);
-	readonly rx: Rx<M> = new Rx(this.#subscribers as Subscribers<M>);
-
-	/**
-	 * Clear subscribers
-	 */
-	clear() {
-		this.#subscribers.clear();
-	}
-
+/** The receiving side of a channel. */
+export interface Rx<M extends MessageMap> {
+    /** Subscribe to a message. Returns an unsubscribe handle. */
+    on<K extends keyof M>(msg: K, listener: Listener<M[K]>): Off;
+    /** Subscribe for a single delivery, then auto-unsubscribe. Returns an unsubscribe handle. */
+    once<K extends keyof M>(msg: K, listener: Listener<M[K]>): Off;
+    /** Unsubscribe a listener by reference. Returns `true` if it existed. */
+    off<K extends keyof M>(msg: K, listener: Listener<M[K]>): boolean;
 }
 
 /**
- * Message Transmitter
+ * A typed pub/sub channel.
+ *
+ * ```ts
+ * const ch = new Channel<{ ':click': [x: number, y: number] }>();
+ * const off = ch.rx.on(':click', (x, y) => {});
+ * ch.tx.send(':click', 10, 20);
+ * off();
+ * ```
  */
-export class Tx<M extends MessageMap> {
+export default class Channel<M extends MessageMap> implements Tx<M>, Rx<M> {
 
-	#subscribers: Subscribers<M>;
+    readonly #subscribers = new Map<keyof M, Set<Listener<any>>>();
 
-	constructor(subscribers: Subscribers<M>) {
-		this.#subscribers = subscribers;
-	}
+    /** The sending view of this channel. */
+    get tx(): Tx<M> {
+        return this;
+    }
 
-	/**
-	 * Emit a signal that provides to the signal's subscribers.
-	 *
-	 * Ex.: tx.send('msg', [...args])
-	 * Returns true if the signal had listeners, false otherwise
-	 */
-	send<S extends M[number]>(msg: S[0], ...args: S[1]): boolean {
-		const listeners = this.#subscribers.get(msg);
-		if (listeners && listeners.size > 0)
-		{
-			for (const cb of listeners) cb(...args);
-			return true;
-		}
-		return false;
-	}
+    /** The receiving view of this channel. */
+    get rx(): Rx<M> {
+        return this;
+    }
 
-	/**
-	 * Emit an async signal that provides to the signal's subscribers.
-	 *
-	 * Ex.: tx.send_async('msg', [...args])
-	 * Returns Promise<true> if the event had listeners, Promise<false> otherwise
-	 */
-	send_async<S extends M[number]>(msg: S[0], ...args: S[1]): Promise<boolean> {
-		return new Promise((resolve) =>
-			setTimeout(() => resolve(this.send(msg, ...args)), 0)
-		);
-	}
+    on<K extends keyof M>(msg: K, listener: Listener<M[K]>): Off {
+        const listeners = this.#subscribers.get(msg);
+        if (listeners) listeners.add(listener);
+        else this.#subscribers.set(msg, new Set([listener]));
+        return () => this.off(msg, listener);
+    }
 
-}
+    once<K extends keyof M>(msg: K, listener: Listener<M[K]>): Off {
+        const off = this.on(msg, (...args) => {
+            off();
+            listener(...args);
+        });
+        return off;
+    }
 
-/**
- * Message Receiver
- */
-export class Rx<M extends MessageMap> {
+    off<K extends keyof M>(msg: K, listener: Listener<M[K]>): boolean {
+        return this.#subscribers.get(msg)?.delete(listener) ?? false;
+    }
 
-	#subscribers: Subscribers<M>;
+    send<K extends keyof M>(msg: K, ...args: M[K]): boolean {
+        const listeners = this.#subscribers.get(msg);
+        if (!listeners || listeners.size === 0) return false;
+        // Snapshot: a listener may (un)subscribe during dispatch — iterate a copy
+        // so this send sees a stable set.
+        for (const listener of [...listeners]) listener(...args);
+        return true;
+    }
 
-	constructor(subscribers: Subscribers<M>) {
-		this.#subscribers = subscribers;
-	}
-
-	/**
-	 * Subscribe on a message.
-     * Returns the provided listener.
-	 *
-	 * Ex.: rx.on('msg', listener)
-	 */
-	on<S extends M[number]>(msg: S[0], listener: (...args: S[1]) => any): (...args: S[1]) => any {
-		const listeners = this.#subscribers.get(msg);
-		if (listeners)
-			listeners.add(listener);
-		else
-			this.#subscribers.set(msg, new Set([listener]));
-
-		return listener;
-  	}
-
-	/**
-	 * Subscribe on a message once (subscriber will be deleted after send).
-     * Returns the provided listener.
-	 *
-	 * Ex.: rx.once('msg', listener)
-	 */
-	once<S extends M[number]>(msg: S[0], listener: (...args: S[1]) => any): (...args: S[1]) => any {
-		return this.on(msg, (self => function f(...args: S[1]) {
-			self.off(msg, f);
-			listener(...args);
-		})(this))
-  	}
-
-	/**
-	 * Subscribe on a signal weak (subscriber will be deleted if it will be dead).
-     * Returns a WeakRef of the provided listener.
-	 *
-	 * Ex.: rx.onweak('msg', listener)
-	 */
-	onweak<S extends M[number]>(msg: S[0], listener: (...args: S[1]) => any): (...args: S[1]) => any {
-		const ref = new WeakRef(listener);
-		this.on(msg, (self => function f(...args: S[1]) {
-			const listener = ref.deref();
-			if (listener)
-				listener(...args);
-			else
-				self.off(msg, f);
-		})(this));
-        return listener;
-  	}
-
-	/**
-	 * Ubsubscribe listener from the message.
-     * Returns true if message and listener existed, false otherwise.
-	 *
-	 * Ex.: rx.off('msg', listener)
-	 */
-	off<S extends M[number]>(msg: S[0], listener: (...args: S[1]) => any): boolean {
-		return !!this.#subscribers.get(msg)?.delete(listener);
-	}
+    /** Remove every subscriber. */
+    clear(): void {
+        this.#subscribers.clear();
+    }
 
 }
