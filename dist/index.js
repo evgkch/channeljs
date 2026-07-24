@@ -16,6 +16,8 @@
  * ```
  */
 export default class Channel {
+    // Invariant: a message key is present iff it has ≥1 listener — `off` prunes an
+    // emptied Set — so `has` is a plain Map lookup and `send` needs no size check.
     #subscribers = new Map();
     /** The sending view of this channel. */
     get tx() {
@@ -41,17 +43,26 @@ export default class Channel {
         return off;
     }
     off(msg, listener) {
-        return this.#subscribers.get(msg)?.delete(listener) ?? false;
+        const listeners = this.#subscribers.get(msg);
+        if (!listeners)
+            return false;
+        const removed = listeners.delete(listener);
+        if (listeners.size === 0)
+            this.#subscribers.delete(msg); // hold the invariant: no empty Sets
+        return removed;
     }
     send(msg, ...args) {
         const listeners = this.#subscribers.get(msg);
-        if (!listeners || listeners.size === 0)
-            return false;
+        if (!listeners)
+            return false; // a stored Set is never empty (see invariant)
         // Snapshot: a listener may (un)subscribe during dispatch — iterate a copy
         // so this send sees a stable set.
         for (const listener of [...listeners])
             listener(...args);
         return true;
+    }
+    has(msg) {
+        return this.#subscribers.has(msg);
     }
     /** Remove every subscriber. */
     clear() {

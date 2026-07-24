@@ -15,6 +15,8 @@ export type Off = () => boolean;
 export interface Tx<M extends MessageMap> {
     /** Emit a message to its subscribers. Returns `true` if it had listeners. */
     send<K extends keyof M>(msg: K, ...args: M[K]): boolean;
+    /** Whether a message currently has any subscribers — a cheap check before building an expensive payload. */
+    has<K extends keyof M>(msg: K): boolean;
 }
 /** The receiving side of a channel. */
 export interface Rx<M extends MessageMap> {
@@ -45,6 +47,7 @@ export default class Channel<M extends MessageMap> implements Tx<M>, Rx<M> {
     once<K extends keyof M>(msg: K, listener: Listener<M[K]>): Off;
     off<K extends keyof M>(msg: K, listener: Listener<M[K]>): boolean;
     send<K extends keyof M>(msg: K, ...args: M[K]): boolean;
+    has<K extends keyof M>(msg: K): boolean;
     /** Remove every subscriber. */
     clear(): void;
 }

@@ -79,6 +79,43 @@ describe('on / off', () => {
     });
 });
 
+describe('has', () => {
+    it('is false when a message has no subscribers', () => {
+        const { ch } = rig<{ m: [] }>();
+        expect(ch.tx.has('m')).toBe(false);
+    });
+
+    it('is true while a listener is subscribed, false after it unsubscribes', () => {
+        const { ch } = rig<{ m: [] }>();
+        const off = ch.rx.on('m', () => {});
+        expect(ch.tx.has('m')).toBe(true);
+        off();
+        expect(ch.tx.has('m')).toBe(false);   // emptied Set still reads as absent
+    });
+
+    it('goes false after a once listener has fired', () => {
+        const { ch } = rig<{ m: [] }>();
+        ch.rx.once('m', () => {});
+        expect(ch.tx.has('m')).toBe(true);
+        ch.tx.send('m');
+        expect(ch.tx.has('m')).toBe(false);
+    });
+
+    it('isolates presence by message', () => {
+        const { ch } = rig<{ a: []; b: [] }>();
+        ch.rx.on('a', () => {});
+        expect(ch.tx.has('a')).toBe(true);
+        expect(ch.tx.has('b')).toBe(false);
+    });
+
+    it('is false after clear', () => {
+        const { ch } = rig<{ m: [] }>();
+        ch.rx.on('m', () => {});
+        ch.clear();
+        expect(ch.tx.has('m')).toBe(false);
+    });
+});
+
 describe('once', () => {
     it('fires exactly once', () => {
         const { ch, log } = rig<{ m: [v: number] }>();

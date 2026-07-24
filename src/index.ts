@@ -19,6 +19,8 @@ export type Off = () => boolean;
 export interface Tx<M extends MessageMap> {
     /** Emit a message to its subscribers. Returns `true` if it had listeners. */
     send<K extends keyof M>(msg: K, ...args: M[K]): boolean;
+    /** Whether a message currently has any subscribers — a cheap check before building an expensive payload. */
+    has<K extends keyof M>(msg: K): boolean;
 }
 
 /** The receiving side of a channel. */
@@ -43,6 +45,8 @@ export interface Rx<M extends MessageMap> {
  */
 export default class Channel<M extends MessageMap> implements Tx<M>, Rx<M> {
 
+    // Invariant: a message key is present iff it has ≥1 listener — `off` prunes an
+    // emptied Set — so `has` is a plain Map lookup and `send` needs no size check.
     readonly #subscribers = new Map<keyof M, Set<Listener<any>>>();
 
     /** The sending view of this channel. */
@@ -71,16 +75,24 @@ export default class Channel<M extends MessageMap> implements Tx<M>, Rx<M> {
     }
 
     off<K extends keyof M>(msg: K, listener: Listener<M[K]>): boolean {
-        return this.#subscribers.get(msg)?.delete(listener) ?? false;
+        const listeners = this.#subscribers.get(msg);
+        if (!listeners) return false;
+        const removed = listeners.delete(listener);
+        if (listeners.size === 0) this.#subscribers.delete(msg);   // hold the invariant: no empty Sets
+        return removed;
     }
 
     send<K extends keyof M>(msg: K, ...args: M[K]): boolean {
         const listeners = this.#subscribers.get(msg);
-        if (!listeners || listeners.size === 0) return false;
+        if (!listeners) return false;   // a stored Set is never empty (see invariant)
         // Snapshot: a listener may (un)subscribe during dispatch — iterate a copy
         // so this send sees a stable set.
         for (const listener of [...listeners]) listener(...args);
         return true;
+    }
+
+    has<K extends keyof M>(msg: K): boolean {
+        return this.#subscribers.has(msg);
     }
 
     /** Remove every subscriber. */
